@@ -33,6 +33,20 @@ Current fork additions:
 Release assets for this fork are published here:
 * https://github.com/hdworkstation103/krita-ai-diffusion/releases
 
+### Live Preview Sequence (Fork)
+
+Sketch / start:
+
+<img width="2311" height="1307" alt="Sketch/start" src="https://github.com/user-attachments/assets/551dd639-35b2-4531-8262-13a8b61fddaf" />
+
+Mid-generation live preview:
+
+<img width="2310" height="1309" alt="Mid-generation preview" src="https://github.com/user-attachments/assets/72c5f992-3a6b-49d6-9b46-7048bacc3f9d" />
+
+Final generation result:
+
+<img width="2311" height="1304" alt="Final generation result" src="https://github.com/user-attachments/assets/039229d7-4595-4a67-b161-eac06b69e23c" />
+
 ## <a name="features"></a> Features
 
 * **Inpainting**: Use selections for generative fill, expand, to add or remove objects
