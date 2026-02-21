@@ -1,6 +1,6 @@
 <h1><img width="64px" src="ai_diffusion/icons/logo-128.png"> Generative AI <i>for Krita</i></h1>
 
-✨[Features](#features) | ⭳ [Download](https://github.com/Acly/krita-ai-diffusion/releases/latest) | 🛠️[Installation](https://docs.interstice.cloud/installation) | 🎞️ [Video](https://youtu.be/Ly6USRwTHe0) | 🖼️[Gallery](#gallery) | 📖[User Guide](https://docs.interstice.cloud) | 💬[Discussion](https://github.com/Acly/krita-ai-diffusion/discussions) | 🗣️[Discord](https://discord.gg/pWyzHfHHhU)
+✨[Features](#features) | ⭳ [Download (Fork Releases)](https://github.com/hdworkstation103/krita-ai-diffusion/releases/latest) | 🛠️[Installation](https://docs.interstice.cloud/installation) | 🎞️ [Video](https://youtu.be/Ly6USRwTHe0) | 🖼️[Gallery](#gallery) | 📖[User Guide](https://docs.interstice.cloud) | 💬[Discussion](https://github.com/Acly/krita-ai-diffusion/discussions) | 🗣️[Discord](https://discord.gg/pWyzHfHHhU)
 
 This is a plugin to use generative AI in image painting and editing workflows
 from within Krita. Visit
@@ -20,6 +20,18 @@ The main goals of this project are:
   to get started quickly without heavy investment.  
 
 [![Watch video demo](media/screenshot-video-preview.webp)](https://youtu.be/Ly6USRwTHe0 "Watch video demo")
+
+## Fork-Specific Notes
+
+This repository is a fork of the upstream project and includes optional live-preview behavior for regular generation.
+
+Current fork additions:
+* Per-step preview updates during regular generation.
+* Final full-resolution image insertion after preview concludes.
+* Configurable preview method hint for Comfy via `KRITA_AI_DIFFUSION_PREVIEW_METHOD` (default: `auto`).
+
+Release assets for this fork are published here:
+* https://github.com/hdworkstation103/krita-ai-diffusion/releases
 
 ## <a name="features"></a> Features
 
@@ -64,7 +76,7 @@ insufficient memory!
 ### Installation
 
 1. If you haven't yet, go and install [Krita](https://krita.org/)! _Required version: 5.2.0 or newer_
-1. [Download the plugin](https://github.com/Acly/krita-ai-diffusion/releases/latest).
+1. [Download the plugin](https://github.com/hdworkstation103/krita-ai-diffusion/releases/latest).
 2. Start Krita and install the plugin via Tools ▸ Scripts ▸ Import Python Plugin from File...
     * Point it to the ZIP archive you downloaded in the previous step.
     * ⚠ _This will delete any previous install of the plugin._ If you are updating from 1.14 or older please read [updating to a new version](https://docs.interstice.cloud/common-issues#update-plugin).
