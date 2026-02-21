@@ -28,7 +28,9 @@ This repository is a fork of the upstream project and includes optional live-pre
 Current fork additions:
 * Per-step preview updates during regular generation.
 * Final full-resolution image insertion after preview concludes.
-* Configurable preview method hint for Comfy via `KRITA_AI_DIFFUSION_PREVIEW_METHOD` (default: `auto`).
+* Configurable preview method hint in plugin settings (Interface Settings → Preview Method Hint).
+  - Options: `auto`, `taesd`, `latent2rgb`
+  - Environment variable fallback (legacy): `KRITA_AI_DIFFUSION_PREVIEW_METHOD`
 * Optional experimental non-destructive canvas overlay preview via `KRITA_AI_DIFFUSION_EXPERIMENTAL_CANVAS_OVERLAY=1`.
 
 Release assets for this fork are published here:

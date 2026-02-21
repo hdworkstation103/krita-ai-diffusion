@@ -36,7 +36,12 @@ if platform_tools.is_macos:
 
 
 def _preview_method() -> str:
-    return os.getenv("KRITA_AI_DIFFUSION_PREVIEW_METHOD", "auto").strip().lower() or "auto"
+    method = settings.preview_method.strip().lower() if settings.preview_method else "auto"
+    env_method = os.getenv("KRITA_AI_DIFFUSION_PREVIEW_METHOD", "").strip().lower()
+    # Backward compatibility: let env var override only while menu setting remains default.
+    if method in ("", "auto") and env_method:
+        method = env_method
+    return method or "auto"
 
 
 @dataclass

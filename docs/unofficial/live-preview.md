@@ -2,10 +2,12 @@
 
 This fork enables per-step preview updates during regular generation.
 
-Environment override:
-- `KRITA_AI_DIFFUSION_PREVIEW_METHOD=auto` (default)
-- `KRITA_AI_DIFFUSION_PREVIEW_METHOD=taesd`
-- `KRITA_AI_DIFFUSION_PREVIEW_METHOD=latent2rgb`
+Preview method configuration:
+- In plugin UI: Interface Settings → Preview Method Hint (`auto`, `taesd`, `latent2rgb`)
+- Environment variable fallback:
+  - `KRITA_AI_DIFFUSION_PREVIEW_METHOD=auto` (default)
+  - `KRITA_AI_DIFFUSION_PREVIEW_METHOD=taesd`
+  - `KRITA_AI_DIFFUSION_PREVIEW_METHOD=latent2rgb`
 
 Notes:
 - Live previews depend on ComfyUI-side preview image emission.
