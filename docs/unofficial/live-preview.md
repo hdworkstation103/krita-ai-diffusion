@@ -10,3 +10,6 @@ Environment override:
 Notes:
 - Live previews depend on ComfyUI-side preview image emission.
 - Final image insertion remains full-resolution at completion.
+- Experimental overlay mode (non-layer preview) can be enabled with:
+  - `KRITA_AI_DIFFUSION_EXPERIMENTAL_CANVAS_OVERLAY=1`
+  - Pan/zoom tracking is supported; behavior across all Krita versions and canvas rotation states is still experimental.

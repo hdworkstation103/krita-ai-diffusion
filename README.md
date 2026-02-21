@@ -29,9 +29,33 @@ Current fork additions:
 * Per-step preview updates during regular generation.
 * Final full-resolution image insertion after preview concludes.
 * Configurable preview method hint for Comfy via `KRITA_AI_DIFFUSION_PREVIEW_METHOD` (default: `auto`).
+* Optional experimental non-destructive canvas overlay preview via `KRITA_AI_DIFFUSION_EXPERIMENTAL_CANVAS_OVERLAY=1`.
 
 Release assets for this fork are published here:
 * https://github.com/hdworkstation103/krita-ai-diffusion/releases
+
+### Enabling Experimental Overlay Mode
+
+This mode renders intermediate previews in a transparent overlay instead of writing each step into a preview layer.
+
+Behavior:
+* Intermediate previews are ephemeral (overlay only).
+* Final generation output is still inserted as a real image layer.
+* Pan/zoom tracking is supported and updates continuously while previewing.
+* This mode is experimental and may behave differently across Krita versions/platforms.
+
+Enable before launching Krita:
+
+Linux/macOS:
+```bash
+KRITA_AI_DIFFUSION_EXPERIMENTAL_CANVAS_OVERLAY=1 krita
+```
+
+Windows (PowerShell):
+```powershell
+$env:KRITA_AI_DIFFUSION_EXPERIMENTAL_CANVAS_OVERLAY = "1"
+krita
+```
 
 ### Live Preview Sequence (Fork)
 
