@@ -12,7 +12,7 @@ from pathlib import Path
 from enum import Enum
 from tempfile import TemporaryDirectory
 from typing import Any, NamedTuple
-from PyQt5.QtCore import QObject, QMetaObject, QUuid, pyqtSignal, Qt, QRect, QRectF, QPointF
+from PyQt5.QtCore import QObject, QMetaObject, QUuid, pyqtSignal, Qt, QRect, QRectF, QPointF, QTimer
 from PyQt5.QtGui import QPainter, QColor, QBrush
 from PyQt5.QtWidgets import QWidget
 
@@ -108,6 +108,10 @@ class _CanvasPreviewOverlay(QWidget):
         self._doc_extent: Extent | None = None
         self._target_rect = QRect()
         self._anchor_widget: QWidget | None = None
+        self._sync_timer = QTimer(self)
+        self._sync_timer.setInterval(33)  # ~30 FPS viewport tracking
+        self._sync_timer.timeout.connect(self._sync_overlay)
+        self._syncing = False
 
     def show_preview(self, image: Image, bounds: Bounds, doc_extent: Extent) -> bool:
         host, anchor = self._find_canvas_host_and_anchor()
@@ -126,15 +130,42 @@ class _CanvasPreviewOverlay(QWidget):
             self._target_rect = self._fallback_target(bounds, doc_extent)
         self.show()
         self.update()
+        if not self._sync_timer.isActive():
+            self._sync_timer.start()
         return True
 
     def hide_preview(self):
+        if self._sync_timer.isActive():
+            self._sync_timer.stop()
         self.hide()
         self._image = None
         self._bounds = None
         self._doc_extent = None
         self._target_rect = QRect()
         self._anchor_widget = None
+
+    def _sync_overlay(self):
+        if self._syncing or self._image is None or self._bounds is None or self._doc_extent is None:
+            return
+        self._syncing = True
+        try:
+            host, anchor = self._find_canvas_host_and_anchor()
+            if host is None:
+                return
+            if self.parentWidget() is not host:
+                self.setParent(host)
+            if self.geometry() != host.rect():
+                self.setGeometry(host.rect())
+            self._anchor_widget = anchor
+
+            rect = self._map_bounds_to_canvas(self._bounds)
+            if rect.width() <= 0 or rect.height() <= 0:
+                rect = self._fallback_target(self._bounds, self._doc_extent)
+            if rect != self._target_rect:
+                self._target_rect = rect
+                self.update()
+        finally:
+            self._syncing = False
 
     def _find_canvas_host_and_anchor(self) -> tuple[QWidget | None, QWidget | None]:
         from krita import Krita  # type: ignore
