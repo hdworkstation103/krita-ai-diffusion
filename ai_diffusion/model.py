@@ -630,6 +630,9 @@ class Model(QObject, ObservableProperties):
             self.progress = message.progress
         elif message.event is ClientEvent.output:
             self.custom.handle_output(job, message.result)
+        elif message.event is ClientEvent.preview:
+            if message.images and len(message.images) > 0:
+                self.show_preview_image(job, message.images[0])
         elif message.event is ClientEvent.finished:
             if message.error:  # successful jobs may have encountered some warnings
                 self.report_error(Error.from_string(message.error, ErrorKind.warning))
@@ -661,7 +664,7 @@ class Model(QObject, ObservableProperties):
 
             if job.id and job.kind in [JobKind.diffusion, JobKind.animation]:
                 action = settings.generation_finished_action
-                if action is GenerationFinishedAction.preview and self._layer is None:
+                if action is GenerationFinishedAction.preview:
                     self.jobs.select(job.id, 0)
                 elif action is GenerationFinishedAction.apply:
                     self.apply_generated_result(job.id, 0)
@@ -681,11 +684,13 @@ class Model(QObject, ObservableProperties):
         if job.kind is JobKind.animation:
             return  # don't show animation preview on canvas (it's slow and clumsy)
 
+        self.show_preview_image(job, job.results[index], name_prefix)
+
+    def show_preview_image(self, job: Job, image: Image, name_prefix="Preview"):
         name = f"[{name_prefix}] {trim_text(job.params.name, 77)}"
-        image = job.results[index]
         bounds = job.params.bounds
         if image.extent != bounds.extent:
-            image = Image.crop(image, Bounds(0, 0, *Extent.min(bounds.extent, image.extent)))
+            image = Image.scale(image, bounds.extent)
         if self._layer and self._layer.was_removed:
             self._layer = None  # layer was removed by user
         if self._layer is not None:
