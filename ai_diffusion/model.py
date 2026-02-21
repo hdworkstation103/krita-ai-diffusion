@@ -152,8 +152,7 @@ class _CanvasPreviewOverlay(QWidget):
                     anchor = obj
                     break
                 obj = obj.parent()
-        # Keep overlay in the same coordinate space used by flakeToCanvasTransform().
-        # Using nested canvas children can introduce a consistent offset (e.g. at 120% startup zoom).
+        # Prefer hosting directly on the canvas viewport to keep drawing clipped to canvas area.
         qwin = win.qwindow()
         if qwin is not None:
             if anchor is None:
@@ -198,7 +197,9 @@ class _CanvasPreviewOverlay(QWidget):
                     )
                     if candidates:
                         anchor = candidates[0]
-            return qwin, anchor
+            if anchor is not None:
+                return anchor, anchor
+            return qwin, None
         if anchor is not None:
             return anchor, anchor
         return None, None
@@ -880,6 +881,14 @@ class Model(QObject, ObservableProperties):
             self.progress = 1
 
             if job.id and job.kind in [JobKind.diffusion, JobKind.animation]:
+                if (
+                    job.kind is JobKind.diffusion
+                    and self._use_overlay_preview
+                    and len(job.results) > 0
+                ):
+                    # Overlay previews are ephemeral: always commit the final result to a real layer.
+                    self.apply_generated_result(job.id, 0)
+                    return
                 action = settings.generation_finished_action
                 if action is GenerationFinishedAction.preview:
                     self.jobs.select(job.id, 0)
