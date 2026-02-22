@@ -1,27 +1,47 @@
 from __future__ import annotations
 
+import math
+import random
 from copy import copy
 from dataclasses import dataclass, field
 from typing import Any, NamedTuple
-import math
-import random
 
 from . import resolution, resources
-from .api import ControlInput, ImageInput, CheckpointInput, SamplingInput, WorkflowInput, LoraInput
-from .api import ExtentInput, InpaintMode, InpaintParams, FillMode, ConditioningInput, WorkflowKind
-from .api import RegionInput, CustomWorkflowInput, UpscaleInput
-from .image import Bounds, Extent, Image, ImageCollection, Mask, multiple_of
+from .api import (
+    CheckpointInput,
+    ConditioningInput,
+    ControlInput,
+    CustomStyleInput,
+    CustomWorkflowInput,
+    ExtentInput,
+    FillMode,
+    ImageInput,
+    InpaintMode,
+    InpaintParams,
+    LoraInput,
+    RegionInput,
+    SamplingInput,
+    UpscaleInput,
+    WorkflowInput,
+    WorkflowKind,
+)
 from .client import ClientModels, ModelDict, Quantization, resolve_arch
-from .files import FileLibrary, FileFormat
-from .style import Style, StyleSettings, SamplerPresets
-from .resolution import ScaledExtent, ScaleMode, TileLayout, get_inpaint_reference
-from .resources import ControlMode, Arch, UpscalerName, ResourceKind, ResourceId
-from .settings import PerformanceSettings
-from .text import eval_wildcards, extract_layers, merge_prompt, extract_loras, strip_prompt_comments
-from .comfy_workflow import ComfyWorkflow, ComfyRunMode, Input, Output, ConditioningOutput
-from .comfy_workflow import ComfyNode
+from .comfy_workflow import (
+    ComfyNode,
+    ComfyRunMode,
+    ComfyWorkflow,
+    ConditioningOutput,
+    Input,
+    Output,
+)
+from .files import FileFormat, FileLibrary
+from .image import Bounds, Extent, Image, ImageCollection, Mask, multiple_of
 from .localization import translate as _
-from .settings import settings
+from .resolution import ScaledExtent, ScaleMode, TileLayout, get_inpaint_reference
+from .resources import Arch, ControlMode, ResourceId, ResourceKind, UpscalerName
+from .settings import PerformanceSettings, settings
+from .style import SamplerPresets, Style, StyleSettings
+from .text import eval_wildcards, extract_layers, extract_loras, merge_prompt, strip_prompt_comments
 from .util import ensure, median_or_zero, unique
 
 
@@ -75,15 +95,15 @@ def snap_to_percent(steps: int, start_at_step: int, max_steps: int) -> int | Non
 
 
 def _sampler_params(sampling: SamplingInput, extent: Extent, strength: float | None = None):
-    params: dict[str, Any] = dict(
-        sampler=sampling.sampler,
-        scheduler=sampling.scheduler,
-        steps=sampling.total_steps,
-        start_at_step=sampling.start_step,
-        cfg=sampling.cfg_scale,
-        seed=sampling.seed,
-        extent=extent,
-    )
+    params: dict[str, Any] = {
+        "sampler": sampling.sampler,
+        "scheduler": sampling.scheduler,
+        "steps": sampling.total_steps,
+        "start_at_step": sampling.start_step,
+        "cfg": sampling.cfg_scale,
+        "seed": sampling.seed,
+        "extent": extent,
+    }
     if strength is not None:
         params["steps"], params["start_at_step"] = apply_strength(strength, sampling.total_steps)
     return params
@@ -555,7 +575,7 @@ def apply_control(
             controlnet = w.set_controlnet_type(controlnet, control.mode)
         elif cn_model := patches.find(control.mode, allow_universal=True):
             patch = w.load_model_patch(cn_model)
-            args = dict(image=image)
+            args = {"image": image}
             if control.mode is ControlMode.inpaint:
                 assert control.mask is not None, "Inpaint control requires a mask"
                 mask = control.mask.load(w)
@@ -565,7 +585,7 @@ def apply_control(
             continue
         elif cn_model := models.lora.find(control.mode):
             if control_lora is not None:
-                raise Exception(
+                raise RuntimeError(
                     _("The following control layers cannot be used together:")
                     + f" {control_lora.text}, {control.mode.text}"
                 )
@@ -575,7 +595,7 @@ def apply_control(
                 prompt, __ = w.instruct_pix_to_pix_conditioning(prompt, vae, image)
             continue
         else:
-            raise Exception(f"ControlNet model not found for mode {control.mode}")
+            raise RuntimeError(f"ControlNet model not found for mode {control.mode}")
 
         if control.mode is ControlMode.inpaint and models.arch is Arch.flux:
             assert control.mask is not None, "Inpaint control requires a mask"
@@ -652,7 +672,7 @@ def apply_ip_adapter(
 
         for control in control_layers:
             if len(embeds) >= 5:
-                raise Exception(_("Too many control layers of type") + f" '{mode.text}' (max 5)")
+                raise RuntimeError(_("Too many control layers of type") + f" '{mode.text}' (max 5)")
             img = control.image.load(w)
             embeds.append(w.encode_ip_adapter(img, control.strength, ip_adapter, clip_vision)[0])
             range = (min(range[0], control.range[0]), max(range[1], control.range[1]))
@@ -751,8 +771,7 @@ def scale(
         factor = max(2, min(4, math.ceil(math.sqrt(ratio))))
         upscale_model = w.load_upscale_model(models.upscale[UpscalerName.fast_x(factor)])
         image = w.upscale_image(upscale_model, image)
-        image = w.scale_image(image, target)
-        return image
+        return w.scale_image(image, target)
 
 
 def scale_to_initial(
@@ -813,8 +832,7 @@ def scale_refine_and_decode(
     model, prompt = apply_control(w, model, prompt, cond.all_control, extent.desired, vae, models)
     prompt = apply_reference_conditioning(w, prompt, upscale, latent, cond, vae, arch, tiled_vae)
     result = w.sampler_custom_advanced(model, prompt, latent, arch, **params)
-    image = vae_decode(w, vae, result, tiled_vae)
-    return image
+    return vae_decode(w, vae, result, tiled_vae)
 
 
 def ensure_minimum_extent(w: ComfyWorkflow, image: Output, extent: Extent, min_extent: int):
@@ -1401,7 +1419,7 @@ def expand_custom(
             elif input.node in nodes:
                 return Output(nodes[input.node], input.output)
             else:
-                raise Exception(
+                raise RuntimeError(
                     f"Cannot map input {input.output} for node {input.node}."
                     + " Make sure the ComfyUI graph does not contain a loop!"
                 )
@@ -1411,19 +1429,21 @@ def expand_custom(
         name = node.input("name", "")
         value = input.params.get(name)
         if value is None:
-            raise Exception(f"Missing required parameter '{name}' for custom workflow")
+            raise RuntimeError(f"Missing required parameter '{name}' for custom workflow")
         if expected_type and not isinstance(value, expected_type):
-            raise Exception(f"Parameter '{name}' must be of type {expected_type}")
+            raise RuntimeError(f"Parameter '{name}' must be of type {expected_type}")
         return value
 
     for node in custom:
         match node.type:
             case "ETN_KritaCanvas":
                 image = ensure(images.initial_image)
-                outputs[node.output(0)] = w.load_image(image)
+                image_out, mask_out = w.load_image_and_mask(image)
+                outputs[node.output(0)] = image_out
                 outputs[node.output(1)] = image.width
                 outputs[node.output(2)] = image.height
                 outputs[node.output(3)] = seed
+                outputs[node.output(4)] = mask_out
             case "ETN_KritaSelection":
                 if images.hires_mask:
                     outputs[node.output(0)] = w.load_mask(images.hires_mask)
@@ -1442,21 +1462,17 @@ def expand_custom(
             case "ETN_KritaMaskLayer":
                 outputs[node.output(0)] = w.load_mask(get_param(node, (Image, ImageCollection)))
             case "ETN_KritaStyle":
-                style: Style = get_param(node, Style)
-                is_live = node.input("sampler_preset", "auto") == "live"
-                checkpoint_input = style.get_models(models.checkpoints)
-                sampling = sampling_from_style(style, 1.0, is_live)
-                model, clip, vae = load_checkpoint_with_lora(w, checkpoint_input, models)
+                style: CustomStyleInput = get_param(node, CustomStyleInput)
+                model, clip, vae = load_checkpoint_with_lora(w, style.models, models)
                 outputs[node.output(0)] = model
                 outputs[node.output(1)] = clip.model
                 outputs[node.output(2)] = vae
-                outputs[node.output(3)] = style.style_prompt
+                outputs[node.output(3)] = style.positive_prompt
                 outputs[node.output(4)] = style.negative_prompt
-                outputs[node.output(5)] = sampling.sampler
-                outputs[node.output(6)] = sampling.scheduler
-                outputs[node.output(7)] = sampling.total_steps
-                outputs[node.output(8)] = sampling.cfg_scale
-
+                outputs[node.output(5)] = style.sampling.sampler
+                outputs[node.output(6)] = style.sampling.scheduler
+                outputs[node.output(7)] = style.sampling.total_steps
+                outputs[node.output(8)] = style.sampling.cfg_scale
             case "ETN_KritaStyleAndPrompt":
                 checkpoint_input = ensure(input.models)
                 sampling = ensure(input.sampling)
@@ -1707,7 +1723,7 @@ def prepare(
         i.batch_count = 1
 
     else:
-        raise Exception(f"Workflow {kind.name} not supported by this constructor")
+        raise ValueError(f"Workflow {kind.name} not supported by this constructor")
 
     if minfo := models.checkpoints.get(i.models.checkpoint):
         if minfo.arch.is_qwen_like and minfo.quantization is Quantization.svdq:

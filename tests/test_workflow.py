@@ -1,29 +1,42 @@
 import itertools
-import pytest
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from ai_diffusion import workflow
-from ai_diffusion.api import LoraInput, WorkflowKind, WorkflowInput, ControlInput, RegionInput
-from ai_diffusion.api import InpaintMode, FillMode, ConditioningInput, CustomWorkflowInput
-from ai_diffusion.api import SamplingInput, ImageInput, UpscaleInput, InpaintParams
-from ai_diffusion.client import ClientModels, CheckpointInfo
-from ai_diffusion.comfy_client import ComfyClient
+from ai_diffusion.api import (
+    ConditioningInput,
+    ControlInput,
+    CustomWorkflowInput,
+    FillMode,
+    ImageInput,
+    InpaintMode,
+    InpaintParams,
+    LoraInput,
+    RegionInput,
+    SamplingInput,
+    UpscaleInput,
+    WorkflowInput,
+    WorkflowKind,
+)
+from ai_diffusion.client import CheckpointInfo, Client, ClientEvent, ClientModels
 from ai_diffusion.cloud_client import CloudClient
+from ai_diffusion.comfy_client import ComfyClient
 from ai_diffusion.comfy_workflow import ComfyWorkflow
-from ai_diffusion.files import FileLibrary, FileCollection, File, FileSource
+from ai_diffusion.files import File, FileCollection, FileLibrary, FileSource
+from ai_diffusion.image import Bounds, Extent, Image, ImageCollection, Mask
+from ai_diffusion.pose import Pose
 from ai_diffusion.resources import ControlMode
 from ai_diffusion.settings import PerformanceSettings
-from ai_diffusion.image import Mask, Bounds, Extent, Image, ImageCollection
-from ai_diffusion.client import Client, ClientEvent
 from ai_diffusion.style import Arch, Style
-from ai_diffusion.pose import Pose
-from ai_diffusion.workflow import detect_inpaint
 from ai_diffusion.util import ensure
+from ai_diffusion.workflow import detect_inpaint
+
 from . import config
-from .config import root_dir, test_dir, image_dir, result_dir, reference_dir, default_checkpoint
+from .config import default_checkpoint, image_dir, reference_dir, result_dir, root_dir, test_dir
 from .conftest import CloudService
 
 service_available = (root_dir / "service" / "web" / ".env.local").exists()
@@ -128,7 +141,7 @@ async def receive_images(client: Client, work: WorkflowInput):
             assert msg.images is not None
             return msg.images
         if msg.event is ClientEvent.error and msg.job_id == job_id:
-            raise Exception(msg.error)
+            raise RuntimeError(msg.error)
     assert False, "Connection closed without receiving images"
 
 
@@ -162,11 +175,14 @@ def dump_workflow(work: WorkflowInput, filename: str, client: Client):
     flow.embed_images().dump((result_dir / "workflows" / filename).with_suffix(".json"))
 
 
+_default_conditioning = ConditioningInput("")
+
+
 def automatic_inpaint(
     image_extent: Extent,
     bounds: Bounds,
     sd_ver: Arch = Arch.sd15,
-    cond: ConditioningInput = ConditioningInput(""),
+    cond: ConditioningInput = _default_conditioning,
 ):
     mode = workflow.detect_inpaint_mode(image_extent, bounds)
     params = detect_inpaint(mode, bounds, sd_ver, cond, strength=1.0)
@@ -221,7 +237,7 @@ def test_prepare_lora():
 
     style = Style(Path("default.json"))
     style.checkpoints = ["CP"]
-    style.loras.append(dict(name="MOTHER_OF_PEARL.safetensors", strength=0.33))
+    style.loras.append({"name": "MOTHER_OF_PEARL.safetensors", "strength": 0.33})
 
     cond = ConditioningInput("test <lora:PINK_UNICORNS:0.77> baloon <lora:x/FRACTAL> space")
     result = workflow.prepare_prompts(cond, style, seed=29, arch=Arch.sd15, files=files)
@@ -677,12 +693,17 @@ def test_control_scribble(qtapp, client, op):
 
     args: dict[str, Any]
     if op == "generate":
-        args = dict(kind=WorkflowKind.generate, canvas=Extent(512, 512))
+        args = {"kind": WorkflowKind.generate, "canvas": Extent(512, 512)}
     elif op == "inpaint":
         params = automatic_inpaint(inpaint_image.extent, mask.bounds)
-        args = dict(kind=WorkflowKind.inpaint, canvas=inpaint_image, mask=mask, inpaint=params)
+        args = {
+            "kind": WorkflowKind.inpaint,
+            "canvas": inpaint_image,
+            "mask": mask,
+            "inpaint": params,
+        }
     elif op == "refine":
-        args = dict(kind=WorkflowKind.refine, canvas=inpaint_image, strength=0.7)
+        args = {"kind": WorkflowKind.refine, "canvas": inpaint_image, "strength": 0.7}
     elif op == "refine_region":
         kind = WorkflowKind.refine_region
         crop_image = Image.crop(inpaint_image, mask.bounds)
@@ -690,14 +711,25 @@ def test_control_scribble(qtapp, client, op):
         crop_mask = Mask(Bounds(0, 0, 256, 512), mask.image)
         params = automatic_inpaint(crop_image.extent, crop_mask.bounds)
         params.grow = params.feather = 0
-        args = dict(kind=kind, canvas=crop_image, mask=crop_mask, strength=0.7, inpaint=params)
+        args = {
+            "kind": kind,
+            "canvas": crop_image,
+            "mask": crop_mask,
+            "strength": 0.7,
+            "inpaint": params,
+        }
     else:  # op == "inpaint_upscale":
         control[0].image = Image.scale(scribble_image, Extent(1024, 1024))
         inpaint_image = Image.scale(inpaint_image, Extent(1024, 1024))
         scaled_mask = Image.scale(Image(mask.image), Extent(512, 1024))
         mask = Mask(Bounds(512, 0, 512, 1024), scaled_mask._qimage)
         params = detect_inpaint(InpaintMode.fill, mask.bounds, Arch.sd15, prompt, 1.0)
-        args = dict(kind=WorkflowKind.inpaint, canvas=inpaint_image, mask=mask, inpaint=params)
+        args = {
+            "kind": WorkflowKind.inpaint,
+            "canvas": inpaint_image,
+            "mask": mask,
+            "inpaint": params,
+        }
 
     job = create(client=client, cond=prompt, **args)
     if op in ["inpaint", "refine_region", "inpaint_upscale"]:
@@ -765,7 +797,7 @@ def test_create_open_pose_vector(qtapp, client: Client):
                 (result_dir / image_name).write_text(result)
                 return
             if msg.event is ClientEvent.error and msg.job_id == job_id:
-                raise Exception(msg.error)
+                raise RuntimeError(msg.error)
         assert False, "Connection closed without receiving images"
 
     qtapp.run(main())
@@ -939,7 +971,7 @@ def test_flux2_outpaint_lora(qtapp, client):
     mask = Mask.rectangle(Bounds(0, 0, 400, 1024), Bounds(0, 0, 880, 1024))
     style = default_style(client, Arch.flux2_4b)
     cond = ConditioningInput("")
-    cond, _, md = workflow.prepare_prompts(cond, style, 1, Arch.flux2_4b, InpaintMode.expand)
+    cond, _, _md = workflow.prepare_prompts(cond, style, 1, Arch.flux2_4b, InpaintMode.expand)
     inpaint = workflow.detect_inpaint(InpaintMode.expand, mask.bounds, Arch.flux2_4b, cond, 1.0)
     inpaint.grow = 40
     inpaint.feather = 37
@@ -1025,7 +1057,7 @@ def test_lora(qtapp, client):
     files = FileLibrary.instance()
     lora = files.loras.add(File.local(test_dir / "data" / "animeoutlineV4_16.safetensors"))
     style = default_style(client, Arch.sd15)
-    style.loras.append(dict(name=lora.id, strength=1.0))
+    style.loras.append({"name": lora.id, "strength": 1.0})
     job = create(
         WorkflowKind.generate,
         client,
@@ -1038,7 +1070,7 @@ def test_lora(qtapp, client):
 
 
 def test_nsfw_filter(qtapp, client):
-    params = dict(cond=ConditioningInput("nude"))
+    params = {"cond": ConditioningInput("nude")}
     job = create(WorkflowKind.generate, client, canvas=Extent(512, 512), **params)
     job.nsfw_filter = 0.8
     run_and_save(qtapp, client, job, "test_nsfw_filter")
@@ -1146,7 +1178,7 @@ def test_inpaint_benchmark(pytestconfig, qtapp, client):
         pytest.skip("Inpaint benchmark runs local")
     print()
 
-    output_dir = config.benchmark_dir / datetime.now().strftime("%Y%m%d-%H%M")
+    output_dir = config.benchmark_dir / datetime.now(UTC).strftime("%Y%m%d-%H%M")
     output_dir.mkdir(parents=True, exist_ok=True)
     seeds = [4213, 897281]
     prompt_modes = ["prompt", "noprompt"]

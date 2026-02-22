@@ -10,10 +10,12 @@ an HTML page with side-by-side comparisons of input images and benchmark results
 """
 
 import argparse
-import json
 import html
-from pathlib import Path
+import json
+import sys
 from collections import defaultdict
+from pathlib import Path
+
 from PIL import Image
 
 
@@ -28,10 +30,11 @@ def load_input_image(image_name: str, images_dir: Path) -> tuple[Image.Image, Im
     try:
         image = Image.open(image_path).convert("RGBA")
         mask = Image.open(mask_path).convert("L")
-        return image, mask
     except Exception as e:
         print(f"Warning: Failed to load {image_name}: {e}")
         return None
+    else:
+        return image, mask
 
 
 def overlay_mask_on_image(
@@ -496,7 +499,7 @@ def generate_html(
             continue
 
         # Get all unique (prompt, seed) combinations from first available column
-        first_col_results = results_by_column[list(results_by_column.keys())[0]]
+        first_col_results = results_by_column[next(iter(results_by_column.keys()))]
         sorted_results = sorted(
             first_col_results,
             key=lambda x: (x["prompt"], x["seed"]),
@@ -723,14 +726,14 @@ Example usage:
 
     try:
         generate_html(benchmark_dirs, output_path, images_dir)
-        return 0
     except Exception as e:
         print(f"Error: {e}")
         import traceback
 
         traceback.print_exc()
         return 1
+    return 0
 
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())

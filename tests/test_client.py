@@ -1,21 +1,31 @@
 import asyncio
 from pathlib import Path
+
 import pytest
 
 from ai_diffusion import eventloop, resources
-from ai_diffusion.api import WorkflowInput, WorkflowKind, LoraInput
-from ai_diffusion.api import CheckpointInput, ImageInput, SamplingInput, ConditioningInput
+from ai_diffusion.api import (
+    CheckpointInput,
+    ConditioningInput,
+    ImageInput,
+    LoraInput,
+    SamplingInput,
+    WorkflowInput,
+    WorkflowKind,
+)
+from ai_diffusion.client import ClientEvent, resolve_arch
+from ai_diffusion.comfy_client import ComfyClient, _preview_method, parse_url, websocket_url
+from ai_diffusion.settings import settings
+from ai_diffusion.files import File, FileFormat, FileLibrary
+from ai_diffusion.image import Extent
+from ai_diffusion.network import NetworkError
 from ai_diffusion.platform_tools import get_cuda_devices
 from ai_diffusion.resources import ControlMode
-from ai_diffusion.network import NetworkError
-from ai_diffusion.image import Extent
-from ai_diffusion.client import ClientEvent, resolve_arch
-from ai_diffusion.comfy_client import ComfyClient, parse_url, websocket_url
+from ai_diffusion.server import Server, ServerBackend, ServerState
 from ai_diffusion.style import Arch, Style
-from ai_diffusion.server import Server, ServerState, ServerBackend
-from ai_diffusion.files import FileLibrary, File, FileFormat
 from ai_diffusion.util import ensure
-from .config import server_dir, default_checkpoint
+
+from .config import default_checkpoint, server_dir
 
 
 @pytest.fixture(scope="session")
@@ -69,7 +79,7 @@ def test_cancel(qtapp, comfy_server: Server, cancel_point):
 
             elif stage == 0:
                 assert msg.event is not ClientEvent.finished
-                assert msg.job_id == job_id or msg.job_id == ""
+                assert msg.job_id in (job_id, "")
                 if not job_id:
                     job_id = await client.enqueue(make_default_work(steps=1000))
                     assert client.queued_count == 1
@@ -95,7 +105,7 @@ def test_cancel(qtapp, comfy_server: Server, cancel_point):
 
             elif stage == 1:
                 assert msg.event is not ClientEvent.interrupted
-                assert msg.job_id == job_id or msg.job_id == ""
+                assert msg.job_id in (job_id, "")
                 if msg.event is ClientEvent.finished:
                     assert msg.images is not None and len(msg.images) > 0
                     assert msg.images[0].extent == Extent(320, 320)
@@ -137,6 +147,20 @@ def test_disconnect(qtapp, comfy_server: Server):
 def test_parse_url(url, expected_http, expected_ws):
     parsed = parse_url(url)
     assert parsed == expected_http and websocket_url(parsed) == expected_ws
+
+
+def test_preview_method_resolution(monkeypatch):
+    original_method = settings.preview_method
+    try:
+        settings.preview_method = "auto"
+        monkeypatch.setenv("KRITA_AI_DIFFUSION_PREVIEW_METHOD", "taesd")
+        assert _preview_method() == "taesd"
+
+        settings.preview_method = "latent2rgb"
+        monkeypatch.setenv("KRITA_AI_DIFFUSION_PREVIEW_METHOD", "taesd")
+        assert _preview_method() == "latent2rgb"
+    finally:
+        settings.preview_method = original_method
 
 
 def check_client_info(client: ComfyClient):
